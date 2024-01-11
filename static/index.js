@@ -1,194 +1,196 @@
 "use strict"
 
-$(document).ready(function () {
-    let divIntestazione = $("#divIntestazione");
-    let divFilters = $(".card").eq(0);
-    let divCollections = $("#divCollections");
-    let table = $("#mainTable");
-    let divDettagli = $("#divDettagli");
+$(document).ready(function() {
+    let divIntestazione = $("#divIntestazione")
+    let divFilters = $(".card").eq(0)
+    let divCollections = $("#divCollections")
+    let table = $("#mainTable")
+    let divDettagli = $("#divDettagli")
     let currentCollection = "";
 
-    divFilters.hide();
-    $("#btnAdd").prop("disabled", true);
-    $("#lstHair").prop("selectedIndex", -1);
+    $("#btnAdd").prop("disabled",false);
+    divFilters.hide()
 
+	$("#lstHair").prop("selectedIndex", -1);
     getCollections();
 
-    $("#btnFind").on("click", () => {
+    $("#btnFind").on("click", function () {
         let hair = $("#lstHair").val();
         let gender = "";
-        if (divFilters.find("input:checkbox:checked").length == 1) {
-            gender = divFilters.find("input:checkbox:checked").val();
+        let filters={};
+
+        if(divFilters.find("input[type=checkbox]:checked").length == 1)
+        {
+            gender = divFilters.find("input[type=checkbox]:checked").val();
         }
-        let filters = {};
-        if (hair) {
-            filters["hair"] = hair.toLowerCase();
-        }
-        if (gender) {
-            filters["gender"] = gender.toLowerCase();
-        }
-        getDataCollection(filters);
+        if(hair)
+            filters["hair"]=hair;
+        if(gender)
+            filters["gender"]=gender;
+
+        let rq = inviaRichiesta("get",`/api/${currentCollection}`,filters);
+        rq.then(function(response){
+            console.log(response["data"]);
+            getDataCollection(currentCollection,filters);
+        })
+        rq.catch(errore);
     });
 
-    $("#btnAdd").on("click", () => {
+    $("#btnAdd").on("click", function () {
         divDettagli.empty();
-        $("<textarea>").appendTo(divDettagli).prop("placeholder", '{"nome": "Pippo"}');
-        $("<button>").addClass("btn btn-success btn-sm").appendTo(divDettagli).text("INVIA").on("click", function () {
-            let newRecord = divDettagli.children("textarea").val();
-            try {
-                newRecord = JSON.parse(newRecord);
-            } catch (error) {
-                alert(`JSON non valido:\n${error}`);
+        $("<textarea>").appendTo(divDettagli).prop("placeholder",`{"nome": "Pippo"}`)
+        $("<button>").addClass("btn btn-success btn-sm").appendTo(divDettagli).text("INVIA").on("click",function(){
+            let newRecord=divDettagli.children("textarea").val()
+            try{
+                newRecord=JSON.parse(newRecord);
+            }
+            catch(error){
+                alert("JSON non valido\n"+error);
                 return;
             }
-            let rq = inviaRichiesta("POST", `/api/${currentCollection}`, newRecord);
-            rq.then((response) => {
-                console.log(response.data);
+            let rq = inviaRichiesta("post",`/api/${currentCollection}`,newRecord);
+            rq.then(function(response){
+                console.log(response["data"]);
                 alert("Record inserito correttamente");
-                getDataCollection();
+                getDataCollection(currentCollection);
             });
             rq.catch(errore);
         });
+        $("<button>").addClass("btn btn-danger btn-sm").appendTo(divDettagli).text("ANNULLA").on("click",function(){
+            divDettagli.empty();
+        });
     });
 
-    /******************************************************/
 
     function getCollections() {
-        let rq = inviaRichiesta("GET", "/api/getCollections");
-        rq.then((response) => {
-            console.log(response.data);
+        let rq=inviaRichiesta("get","/api/getCollections");
+        rq.then(function(response){
+            console.log(response["data"]);
             let label = divCollections.children("label");
-            response.data.forEach((item, i) => {
-                let clonedLabel = label.clone().appendTo(divCollections);
-                clonedLabel.children("span").text(item.name);
-                clonedLabel.children("input:radio").on("click", function () {
-                    currentCollection = $(this).next("span").text();
-                    $("#btnAdd").prop("disabled", false);
-                    getDataCollection();
-                });
+            response["data"].forEach(element => {
+                let clonedLabel= label.clone().appendTo(divCollections);
+                clonedLabel.children("span").text(element["name"]);
+                clonedLabel.children("input:radio").on("click", function(){
+                    $("#btnAdd").prop("disabled",false);
+                    getDataCollection($(this).next("span").text());
+                }); //il rischio è che venga assegnato + volte
             });
             label.remove();
-        });
+        })
         rq.catch(errore);
     }
 
-    function getDataCollection(filters = {}) {
-        let rq = inviaRichiesta("GET", `/api/${currentCollection}`, filters);
-        rq.then((response) => {
-            console.log(response.data);
-            divIntestazione.find("strong").eq(0).text(currentCollection);
-            divIntestazione.find("strong").eq(1).text(response.data.length);
-            let _tbody = table.children("tbody");
-            _tbody.empty();
-            response.data.forEach((item, i) => {
-                let tr = $("<tr>").appendTo(_tbody);
-                $("<td>").appendTo(tr).text(item._id).on("click", function () {
-                    getDetails(item._id);
+    function getDataCollection(coll,filters={}){
+        let collection = coll;
+        currentCollection = collection;
+        let rq=inviaRichiesta("get",`/api/${collection}`,filters);
+        rq.then(function(response){
+            console.log(response["data"]);
+            divIntestazione.find("strong").eq(0).text(collection);
+            divIntestazione.find("strong").eq(1).text(response["data"].length);
+            let _tbody = table.children("tbody").empty();
+            response["data"].forEach(element => {
+                let tr= $("<tr>").appendTo(_tbody);
+                $("<td>").appendTo(tr).text(element["_id"]).on("click",function () {
+                    getDetails(element["_id"]);
                 });
-                // Facendo così si prende la seconda chiave qualunque essa sia
-                let key = Object.keys(item)[1];
-                $("<td>").appendTo(tr).text(item[key]).on("click", function () {
-                    getDetails(item._id);
+                let key = Object.keys(element)[1];
+                $("<td>").appendTo(tr).text(element[key]).on("click",function () {
+                    getDetails(element["_id"]);
                 });
-                let td = $("<td>").appendTo(tr);
-                $("<div>").appendTo(td).on("click", () => {
-                    getDetails(item._id, "patch");
+                let td=$("<td>").appendTo(tr);
+                $("<div>").appendTo(td).on("click",function () {
+                    getDetails(element["_id"], "patch");
+
                 });
-                $("<div>").appendTo(td).on("click", () => {
-                    getDetails(item._id, "put");
+                $("<div>").appendTo(td).on("click",function () {
+                    getDetails(element["_id"], "put");
                 });
-                $("<div>").appendTo(td).on("click", () => {
-                    deleteRecord(item._id);
+                $("<div>").appendTo(td).on("click",function () {
+                    deleteRecord(element["_id"]);
                 });
             });
-            if (currentCollection == "unicorns") {
+            if(collection == "unicorns")
                 divFilters.show();
-            }
-            else {
+            else{
                 divFilters.hide();
-                divFilters.find("input:checkbox").prop("checked", false);
+                divFilters.find("input[type=checkbox]").prop("checked",false);
                 $("#lstHair").prop("selectedIndex", -1);
-            }
+            }  
             divDettagli.empty();
-        });
+        })
         rq.catch(errore);
     }
 
-    function getDetails(_id, method = "get") {
-        let rq = inviaRichiesta("GET", `/api/${currentCollection}/${_id}`);
-        rq.then((response) => {
-            console.log(response.data);
+    function getDetails(id, method="get"){
+        let rq=inviaRichiesta("get",`/api/${currentCollection}/${id}`);
+        rq.then(function(response){
+            console.log(response["data"]);
             divDettagli.empty();
-            $("<strong>").appendTo(divDettagli).text("DETTAGLI:");
-            $("<br>").appendTo(divDettagli);
-            $("<br>").appendTo(divDettagli);
-            if (method == "get") {
-                for (let key in response.data) {
-                    $("<strong>").appendTo(divDettagli).text(`${key}: `);
-                    $("<span>").appendTo(divDettagli).text(JSON.stringify(response.data[key]));
+            if(method == "get"){
+                for (let key in response["data"]) {
+                    $("<strong>").appendTo(divDettagli).text(key+": ");
+                    $("<span>").appendTo(divDettagli).text(JSON.stringify(response["data"][key]));
                     $("<br>").appendTo(divDettagli);
                 }
             }
-            else {
-                // Permette di eliminare la chiave _id perchè non dobbiamo modificarla
-                delete (response.data["_id"]);
-                let textarea = $("<textarea>").appendTo(divDettagli).val(JSON.stringify(response.data, null, 3));
-                textarea.css("height", `${textarea.get(0).scrollHeight}px`);
-                $("<button>").appendTo(divDettagli).text("AGGIORNA").addClass("btn btn-sm btn-success").on("click", function () {
-                    let updatedRecord = divDettagli.children("textarea").val();
-                    try {
-                        updatedRecord = JSON.parse(updatedRecord);
-                    } catch (error) {
-                        alert(`JSON non valido:\n${error}`);
+            else{
+                delete response["data"]["_id"];
+                let textArea=$("<textarea>").appendTo(divDettagli);
+                if(method.toLocaleLowerCase() == "patch"){
+                    textArea.val(JSON.stringify({"$set": {"residenza" : "Fossano"}},null,3));                }
+                else
+                    textArea.val(JSON.stringify(response["data"],null,3))
+                textArea.css("height",textArea.get(0).scrollHeight+"px");
+                $("<button>").addClass("btn btn-success btn-sm").appendTo(divDettagli).text("AGGIORNA").on("click",function(){
+                    let updatedRecord=divDettagli.children("textarea").val()
+                    try{
+                        updatedRecord=JSON.parse(updatedRecord);
+                    }
+                    catch(error){
+                        alert("JSON non valido\n"+error);
                         return;
                     }
-                    let rq = inviaRichiesta(method.toUpperCase(), `/api/${currentCollection}/${_id}`, updatedRecord);
-                    rq.then((response) => {
-                        console.log(response.data);
-                        alert("Aggiornamento avvenuto correttamente");
-                        getDataCollection();
-                    })
+                    let rq = inviaRichiesta(method,`/api/${currentCollection}/${id}`,updatedRecord);
+                    rq.then(function(response){
+                        console.log(response["data"]);
+                        alert("Record aggiornato correttamente");
+                        getDataCollection(currentCollection);
+                    });
                     rq.catch(errore);
                 });
+                $("<button>").addClass("btn btn-danger btn-sm").appendTo(divDettagli).text("ANNULLA").on("click",function(){
+                    divDettagli.empty();
+                });
             }
-        });
+           
+        })
         rq.catch(errore);
     }
 
-    function deleteRecord(_id) {
-        if (confirm("Vuoi veramente cancellare questo record?")) {
-            let rq = inviaRichiesta("DELETE", `/api/${currentCollection}/${_id}`);
-            rq.then((response) => {
-                console.log(response.data);
-                alert("Record cancellato correttamente");
-                getDataCollection();
-            });
+    function deleteRecord(id){
+        if(confirm("Sei sicuro di voler eliminare il record?"))
+        {
+            let rq=inviaRichiesta("delete",`/api/${currentCollection}/${id}`);
+            rq.then(function(response){
+                console.log(response["data"]);
+                alert("Record eliminato correttamente");
+                getDataCollection(currentCollection);
+            })
             rq.catch(errore);
         }
+        
     }
 
     $("#test").hide();
-
-    $("#test").on("click", () => {
-        let filters = { "hair": "blonde", "gender": "f" };
-        let action = { "$inc": { "vampires": 10 } };
-        let rq = inviaRichiesta("PATCH", "/api/unicorns", { filters, action });
-        rq.then((response) => {
-            console.log(response.data);
-            alert("Aggiornamento avvenuto correttamente");
-            getDataCollection();
-        });
+    $("#test").on("click", function () {
+        let filters={"hair":"blonde","gender":"f"};
+        let action={"$inc":{"vampires":10}};
+        let rq = inviaRichiesta("patch","/api/unicorns",filters,action);
+        rq.then(function(response){
+            console.log(response["data"]);
+            getDataCollection("unicorns");
+        })
         rq.catch(errore);
-    });
-    
-    $("#test").on("click", () => {
-        let filters = { "hair": "blonde", "gender": "m" };
-        let rq = inviaRichiesta("DELETE", "/api/unicorns", filters);
-        rq.then((response) => {
-            console.log(response.data);
-            alert("Cancellazione avvenuta correttamente");
-            getDataCollection();
-        });
-        rq.catch(errore);
-    });
+    });   
 });
