@@ -34,7 +34,7 @@ function init(){
             paginaErrore = "<h1>Risorsa non trovata</h1>";
         }
         else{
-            paginaErrore=data.toString();
+            paginaErrore=data.toString(); // converte il buffer in stringa
         }
     });
 }
@@ -264,28 +264,21 @@ app.patch("/api/:collection",async (req:any, res:any, next:any) => {
     rq.finally(() => client.close());
 });
 
-app.put("/api/:collection/:id",async (req:any, res:any, next:any) => {
+app.put("/api/:collection/:id", async (req, res, next) => {
+	let id = req["params"].id
+    let objId;
+	if(ObjectId.isValid(id)) 
+		objId = new ObjectId(id)
+	else
+		objId = id as unknown as ObjectId;	    
+    let selectedCollection = req["params"].collection;
+	let newValues = req["body"]; 
     const client = new MongoClient(connectionString);
     await client.connect();
-    let selectedCollection = req["params"]["collection"];
-    let id = req["params"]["id"];
-    let objId;
-    if(ObjectId.isValid(id)){
-        objId = new ObjectId(id);
-    }
-    else{
-        objId = id as unknown as ObjectId;
-    }
-    let updateRecord = req["body"];
     let collection = client.db(DBNAME).collection(selectedCollection);
-
-    let rq = collection.replaceOne({"_id":objId},updateRecord);
-    rq.then((data) => {
-        res.send(data);
-    });
-    rq.catch((err) => {
-        res.status(500).send("Errore esecuzione query: "+err);
-    });
+    let rq = collection.updateOne({"_id":objId}, {"$set":newValues});
+    rq.then((data) => res.send(data));
+    rq.catch((err) => res.status(500).send(`Errore esecuzione query: ${err}`));
     rq.finally(() => client.close());
 });
 
